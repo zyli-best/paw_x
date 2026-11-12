@@ -1,0 +1,26 @@
+{
+  "prompt-core": {
+    "api_version": 1,
+    "modules": [
+      "qwenpaw.agents.context.progress_middleware",
+      "qwenpaw.agents.context.scroll.prompt",
+      "qwenpaw.agents.memory.adbpg_prompts",
+      "qwenpaw.agents.memory.proactive.proactive_prompts",
+      "qwenpaw.agents.memory.prompts",
+      "qwenpaw.agents.prompt",
+      "qwenpaw.agents.prompt_builder",
+      "qwenpaw.app.chats.utils",
+      "qwenpaw.config.shell_policy",
+      "qwenpaw.loop.model_loop",
+      "qwenpaw.modes.coding.mixin",
+      "qwenpaw.modes.goal.prompts",
+      "qwenpaw.modes.mission.prompts",
+      "qwenpaw.prompt_resources",
+      "qwenpaw.runtime.edge_cloud.prompts",
+      "qwenpaw.runtime.final_files.prompts",
+      "qwenpaw.runtime.prompt_contributors",
+      "qwenpaw.runtime.prompt_manager",
+      "qwenpaw.utils.bundled_runtime"
+    ]
+  }
+}

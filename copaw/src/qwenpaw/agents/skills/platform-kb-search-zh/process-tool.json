@@ -1,0 +1,23 @@
+{
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "platform_kb_ids"
+    ],
+    "properties": {
+      "platform_kb_ids": {
+        "type": "string",
+        "title": "知识库",
+        "x-ui": {
+          "control": "platform-knowledge-base-picker"
+        }
+      }
+    }
+  },
+  "bindings": {
+    "kbInfoUuids": {
+      "source": "request_input",
+      "key": "platform_kb_ids"
+    }
+  }
+}

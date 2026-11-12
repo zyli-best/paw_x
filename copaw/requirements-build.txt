@@ -1,0 +1,5 @@
+# Exact build tool versions from the original Python 3.11.9 environment.
+pip==26.2.1
+setuptools==65.5.0
+pyinstaller==6.21.0
+pyinstaller-hooks-contrib==2026.6

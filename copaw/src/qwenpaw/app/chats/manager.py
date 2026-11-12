@@ -1,0 +1,324 @@
+# -*- coding: utf-8 -*-
+"""Chat manager for managing chat specifications."""
+from __future__ import annotations
+
+import asyncio
+import logging
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from .models import ChatSpec, ChatUpdate, SessionSource
+from .repo import BaseChatRepository
+from ..channels.schema import DEFAULT_CHANNEL
+
+logger = logging.getLogger(__name__)
+
+
+class ChatManager:
+    """Manages chat specifications in repository.
+
+    Only handles ChatSpec CRUD operations.
+    Does NOT manage Redis session state - that's handled by SafeJSONSession.
+
+    Similar to CronManager's role in crons module.
+    """
+
+    def __init__(
+        self,
+        *,
+        repo: BaseChatRepository,
+        workspace_dir: Path | None = None,
+    ):
+        """Initialize chat manager.
+
+        Args:
+            repo: Chat spec repository for persistence
+        """
+        self._repo = repo
+        self._workspace_dir = workspace_dir
+        self._lock = asyncio.Lock()
+        logger.debug(
+            f"ChatManager created with repo path: {repo.path}",
+        )
+
+    # ----- Read Operations -----
+
+    async def list_chats(
+        self,
+        user_id: Optional[str] = None,
+        channel: Optional[str] = None,
+    ) -> list[ChatSpec]:
+        """List chat specs with optional filters.
+
+        Args:
+            user_id: Optional user ID filter
+            channel: Optional channel filter
+
+        Returns:
+            List of chat specifications
+        """
+        async with self._lock:
+            logger.debug(
+                f"list_chats: repo path={self._repo.path}, "
+                f"filters: user_id={user_id}, channel={channel}",
+            )
+            return await self._repo.filter_chats(
+                user_id=user_id,
+                channel=channel,
+            )
+
+    async def get_chat(self, chat_id: str) -> Optional[ChatSpec]:
+        """Get chat spec by chat_id (UUID).
+
+        Args:
+            chat_id: Chat UUID
+
+        Returns:
+            Chat spec or None if not found
+        """
+        async with self._lock:
+            return await self._repo.get_chat(chat_id)
+
+    async def get_or_create_chat(
+        self,
+        session_id: str,
+        user_id: str,
+        channel: str = DEFAULT_CHANNEL,
+        name: str = "New Chat",
+        source: str | SessionSource = SessionSource.chat,
+    ) -> ChatSpec:
+        """Get existing chat or create new one.
+
+        Useful for auto-registration when chats come from channels.
+
+        Args:
+            session_id: Session identifier (channel:user_id)
+            user_id: User identifier
+            channel: Channel name
+            name: Chat name
+
+        Returns:
+            Chat specification (existing or newly created)
+        """
+        async with self._lock:
+            # Try to find existing by session_id
+            logger.debug(
+                f"get_or_create_chat: Searching for existing chat: "
+                f"session_id={session_id}, user_id={user_id}, "
+                f"channel={channel}",
+            )
+            existing = await self._repo.get_chat_by_id(
+                session_id,
+                user_id,
+                channel,
+            )
+            if existing:
+                logger.debug(
+                    f"get_or_create_chat: Found existing chat: {existing.id}",
+                )
+                return existing
+
+            # Create new
+            logger.debug(
+                f"get_or_create_chat: Creating new chat for "
+                f"session_id={session_id}, source={source}",
+            )
+            try:
+                resolved_source = SessionSource(source)
+            except ValueError:
+                resolved_source = SessionSource.chat
+            spec = ChatSpec(
+                session_id=session_id,
+                user_id=user_id,
+                channel=channel,
+                name=name,
+                source=resolved_source,
+            )
+            logger.debug(f"get_or_create_chat: created spec={spec.id}")
+            # Call internal create without lock (already locked)
+            await self._repo.upsert_chat(spec)
+            logger.info(
+                f"Auto-registered new chat: {spec.id} -> {session_id}",
+            )
+            return spec
+
+    async def create_chat(self, spec: ChatSpec) -> ChatSpec:
+        """Create a new chat.
+
+        Args:
+            spec: Chat specification (chat_id will be generated if not set)
+
+        Returns:
+            Chat spec
+        """
+        async with self._lock:
+            await self._repo.upsert_chat(spec)
+            return spec
+
+    async def patch_chat(
+        self,
+        chat_id: str,
+        patch: ChatUpdate,
+    ) -> Optional[ChatSpec]:
+        """Merge a partial update into the latest persisted chat spec."""
+        async with self._lock:
+            return await self._patch_locked(chat_id, patch)
+
+    async def patch_chat_if_name_matches(
+        self,
+        chat_id: str,
+        expected_name: str,
+        patch: ChatUpdate,
+    ) -> Optional[ChatSpec]:
+        """Atomic compare-and-set on ``ChatSpec.name``.
+
+        Apply ``patch`` only when the persisted name still equals
+        ``expected_name``. The read and write happen under a single lock
+        acquisition so a concurrent rename cannot slip in between, which
+        is what background tasks like async title generation rely on to
+        avoid clobbering a user-chosen name.
+
+        Returns the updated spec on success, ``None`` if the chat does
+        not exist or its name no longer matches.
+        """
+        async with self._lock:
+            existing = await self._repo.get_chat(chat_id)
+            if existing is None or existing.name != expected_name:
+                return None
+            return await self._patch_locked(chat_id, patch, existing=existing)
+
+    async def _patch_locked(
+        self,
+        chat_id: str,
+        patch: ChatUpdate,
+        *,
+        existing: Optional[ChatSpec] = None,
+    ) -> Optional[ChatSpec]:
+        """Internal patch helper. Caller must hold ``self._lock``."""
+        if existing is None:
+            existing = await self._repo.get_chat(chat_id)
+            if existing is None:
+                return None
+
+        updates = patch.model_dump(
+            exclude_none=True,
+            exclude_unset=True,
+        )
+        merged = existing.model_copy(update=updates)
+        merged.updated_at = datetime.now(timezone.utc)
+        await self._repo.upsert_chat(merged)
+        return merged
+
+    async def touch_chat(self, chat_id: str) -> Optional[ChatSpec]:
+        """Refresh updated_at without rewriting other chat fields."""
+        return await self.patch_chat(chat_id, ChatUpdate())
+
+    async def delete_chats(self, chat_ids: list[str]) -> bool:
+        """Delete a chat spec.
+
+        Note: This only deletes the spec. Redis session state is NOT deleted.
+
+        Args:
+            chat_ids: List of chat IDs
+
+        Returns:
+            True if deleted, False if not found
+        """
+        async with self._lock:
+            cleanup = set()
+            if self._workspace_dir is not None and sys.platform == "win32" and chat_ids:
+                deleting = set(chat_ids)
+                chats = (await self._repo.load()).chats
+                cleanup = {chat.session_id.strip() for chat in chats if chat.id in deleting} - {
+                    chat.session_id.strip() for chat in chats if chat.id not in deleting
+                }
+            deleted = await self._repo.delete_chats(chat_ids)
+
+            if deleted:
+                logger.debug(f"Deleted chats: {chat_ids}")
+                if cleanup:
+                    from ...utils.runtime_storage import retire_session_environment
+
+                    for session_id in cleanup:
+                        try:
+                            await asyncio.to_thread(retire_session_environment, self._workspace_dir, session_id)
+                        except (OSError, ValueError):
+                            logger.exception("Could not retire session runtime environment for %s", session_id)
+
+            return deleted
+
+    async def count_chats(
+        self,
+        user_id: Optional[str] = None,
+        channel: Optional[str] = None,
+    ) -> int:
+        """Count chats matching filters.
+
+        Args:
+            user_id: Optional user ID filter
+            channel: Optional channel filter
+
+        Returns:
+            Number of matching chats
+        """
+        async with self._lock:
+            chats = await self._repo.filter_chats(
+                user_id=user_id,
+                channel=channel,
+            )
+            return len(chats)
+
+    async def get_chat_id_by_session(
+        self,
+        session_id: str,
+        channel: str,
+        user_id: str | None = None,
+    ) -> str | None:
+        """Get chat_id by session_id and channel.
+
+        Args:
+            session_id: Normalized session ID (e.g. "console:user1")
+            channel: Channel name
+            user_id: Optional user ID. When provided, only chats owned by
+                this user are considered. This isolates users that share the
+                same session_id (e.g. members of the same group chat, or
+                different DM users whose conversation_id suffix collides), so
+                a /stop from one user never cancels another user's task.
+                When None/empty, all matching chats are considered
+                (backward-compatible behavior).
+
+        Returns:
+            chat_id (UUID) of most recent chat if found, None otherwise
+
+        Note:
+            Returns most recently updated chat if multiple matches exist.
+            O(N) scan of active chats. Future optimization: add index.
+        """
+        async with self._lock:
+            chats = await self._repo.filter_chats(channel=channel)
+            # Single pass: match session_id, and when a user_id is given,
+            # also require it to match. An empty/None user_id means "no user
+            # filter" (backward-compatible).
+            matching_chats = [
+                chat
+                for chat in chats
+                if chat.session_id == session_id
+                and (not user_id or chat.user_id == user_id)
+            ]
+
+            if not matching_chats:
+                logger.debug(
+                    f"No chat found for session={session_id[:30]} "
+                    f"channel={channel} user_id={user_id}",
+                )
+                return None
+
+            most_recent = max(matching_chats, key=lambda c: c.updated_at)
+            logger.debug(
+                f"Found chat_id={most_recent.id} "
+                f"for session={session_id[:30]} user_id={user_id} "
+                f"(from {len(matching_chats)} matches)",
+            )
+            return most_recent.id

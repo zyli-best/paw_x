@@ -1,0 +1,6 @@
+{
+  "endpoint": "http://10.159.252.27:30080/higress/higressGatewayMcp/mcp-servers/kbsearch-lab",
+  "timeoutSeconds": 30,
+  "maxResponseBytes": 2097152
+}
+

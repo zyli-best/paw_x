@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "platform": "windows-x86_64",
+  "runtimes": {
+    "python": {
+      "version": "3.11.18",
+      "distribution": "python-build-standalone install_only_stripped",
+      "release": "20261026",
+      "source": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261026",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.11.18%2B20261026-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "filename": "cpython-3.11.18+20261026-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "67215a7bf1643e33d01b17ee3f1e91a8b0b39163746855ee02594bf0608f68b4",
+      "archive_root": "python",
+      "executables": {"python": "python/python.exe"}
+    },
+    "nodejs": {
+      "version": "22.23.4",
+      "npm_version": "10.9.9",
+      "distribution": "Node.js official Windows x64 ZIP",
+      "source": "https://nodejs.org/en/download/archive/v22.23.4",
+      "checksums": "https://nodejs.org/dist/v22.23.4/SHASUMS256.txt",
+      "url": "https://nodejs.org/dist/v22.23.4/node-v22.23.4-win-x64.zip",
+      "filename": "node-v22.23.4-win-x64.zip",
+      "sha256": "cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20",
+      "archive_root": "node-v22.23.4-win-x64",
+      "executables": {
+        "node": "node/node.exe",
+        "npm": "node/npm.cmd",
+        "npx": "node/npx.cmd",
+        "npm_cli": "node/node_modules/npm/bin/npm-cli.js",
+        "npx_cli": "node/node_modules/npm/bin/npx-cli.js"
+      }
+    },
+    "git": {
+      "version": "2.56.0.windows.4",
+      "distribution": "Git for Windows PortableGit x64 (includes Bash)",
+      "source": "https://github.com/git-for-windows/git/releases/tag/v2.56.0.windows.4",
+      "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.4/PortableGit-2.56.0.4-64-bit.7z.exe",
+      "filename": "PortableGit-2.56.0.4-64-bit.7z.exe",
+      "sha256": "b1f3e52216e2ed6882d1bebfd4d3fdf319bec40d2edbbf9fd26ec4fd3fce7ed1",
+      "executables": {"git": "git/cmd/git.exe", "bash": "git/bin/bash.exe"}
+    }
+  }
+}

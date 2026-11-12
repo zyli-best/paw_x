@@ -1,0 +1,26 @@
+# Local environments, build outputs, and test artifacts
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+!/copaw/native-libs/**/*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.log
+/paw-native-src/**/build/
+/paw-native-src/**/dist/
+/copaw/console.zip
+/copaw/pelican-bicycle.html
+/copaw/pelican-panel-test.png
+/copaw/pelican-step1-initial.png
+/copaw/pelican-viewport-test.png

@@ -1,0 +1,58 @@
+# Local environments and dependencies
+.venv/
+venv/
+node_modules/
+*.egg-info/
+__pycache__/
+*.py[cod]
+!/native-libs/**/*.pyd
+*.tsbuildinfo
+
+# Generated builds and release archives
+/build/
+/dist/
+/paw-runtime/
+/paw-runtime.zip
+/paw.zip
+/runtimes/
+console/dist/
+src/qwenpaw/console/
+
+# Runtime data and credentials
+.devco_paw*/
+.qwenpaw*/
+.copaw*/
+.reme/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+*.rdb
+*.log
+logs/
+session_tmp/
+sessions_mount_dir/
+providers.json
+envs.json
+/tests/probe_gpt_responses.local.json
+.devcopaw-launcher.lock
+
+# Editor/test caches
+.idea/
+.vscode/
+.codex/
+.agents/
+.qoder/
+.scratch/
+.cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+coverage/
+htmlcov/
+Thumbs.db
+.DS_Store
+
+# Keep the built-in resource archive in Git.
+# Do not ignore *.zip, all AGENTS.md, or all config.json files.
